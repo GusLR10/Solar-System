@@ -1,0 +1,53 @@
+package audio;
+
+import org.lwjgl.BufferUtils;
+
+import javax.sound.sampled.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+
+import static org.lwjgl.openal.AL10.*;
+
+public class WaveData {
+
+    public final int format;
+    public final int samplerate;
+    public final ByteBuffer data;
+
+    private WaveData(ByteBuffer data, int format, int samplerate) {
+        this.data = data;
+        this.format = format;
+        this.samplerate = samplerate;
+    }
+
+    public void dispose() {
+        data.clear();
+    }
+
+    public static WaveData create(String file) {
+        try (InputStream stream = WaveData.class.getResourceAsStream(file)) {
+            AudioInputStream ais = AudioSystem.getAudioInputStream(stream);
+            AudioFormat audioFormat = ais.getFormat();
+
+            int format = getOpenALFormat(audioFormat.getChannels(), audioFormat.getSampleSizeInBits());
+
+            byte[] buffer = ais.readAllBytes();
+            ByteBuffer data = BufferUtils.createByteBuffer(buffer.length);
+            data.put(buffer);
+            data.flip();
+
+            return new WaveData(data, format, (int) audioFormat.getSampleRate());
+        } catch (UnsupportedAudioFileException | IOException e) {
+            throw new RuntimeException("Failed to load audio file: " + file, e);
+        }
+    }
+
+    private static int getOpenALFormat(int channels, int bitsPerSample) {
+        if (channels == 1) {
+            return bitsPerSample == 8 ? AL_FORMAT_MONO8 : AL_FORMAT_MONO16;
+        } else {
+            return bitsPerSample == 8 ? AL_FORMAT_STEREO8 : AL_FORMAT_STEREO16;
+        }
+    }
+}
