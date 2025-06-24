@@ -9,7 +9,6 @@ import audio.AudioMaster;
 import renderEngine.DisplayManager;
 import renderEngine.Loader;
 import renderEngine.MasterRenderer;
-import renderEngine.OBJLoader;
 import terrains.Terrain;
 import textures.ModelTexture;
 import entities.Entity;
@@ -170,11 +169,38 @@ public class MainGameLoop {
         ModelTexture neptunoTexture = new ModelTexture(loader.loadTexture("neptuno"));
         ModelTexture lunaTexture = new ModelTexture(loader.loadTexture("moon"));
         ModelTexture ringTexture = new ModelTexture(loader.loadTexture("saturn_ring"));
+        
+        mercurioTexture.setShineDamper(10f);
+        mercurioTexture.setReflectivity(0.1f);
+
+        venusTexture.setShineDamper(5f);
+        venusTexture.setReflectivity(0.3f);
+
+        tierraTexture.setShineDamper(8f);
+        tierraTexture.setReflectivity(0.2f);
+
+        marteTexture.setShineDamper(12f);
+        marteTexture.setReflectivity(0.3f);
+
+        jupiterTexture.setShineDamper(6f);
+        jupiterTexture.setReflectivity(0.5f);
+
+        saturnoTexture.setShineDamper(7f);
+        saturnoTexture.setReflectivity(0.4f);
+
+        uranoTexture.setShineDamper(9f);
+        uranoTexture.setReflectivity(0.3f);
+
+        neptunoTexture.setShineDamper(9f);
+        neptunoTexture.setReflectivity(0.2f);
+
+        lunaTexture.setShineDamper(11f);
+        lunaTexture.setReflectivity(0.1f);
+
+        ringTexture.setShineDamper(4f);
+        ringTexture.setReflectivity(0.2f);
 
         TexturedModel sunModel = new TexturedModel(sunModelRaw, sunTexture);
-        ModelTexture texture = sunModel.getTexture();
-        texture.setShineDamper(1000);
-        texture.setReflectivity(100);
         Entity sun = new Entity(sunModel, new Vector3f(0, 0, 0), 0, 0, 0, 0.5f);
         
         Entity planet1 = new Entity(new TexturedModel(model, mercurioTexture), new Vector3f(0.3f, 0, 0), 0, 0, 0, 0.1f);
@@ -251,6 +277,7 @@ public class MainGameLoop {
             saturnRing.increaseRotation(0, 1f, 0);
 
             camera.move();
+            light.setPosition(sun.getPosition());
 
             renderer.processTerrain(terrain);
             renderer.processTerrain(terrain2);
