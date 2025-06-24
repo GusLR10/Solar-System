@@ -1,0 +1,87 @@
+package audio;
+
+import org.lwjgl.openal.AL;
+import org.lwjgl.openal.AL10;
+import org.lwjgl.BufferUtils;
+
+import javax.sound.sampled.*;
+
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
+public class AudioMaster {
+
+    private static List<Integer> buffers = new ArrayList<>();
+    private static List<Integer> sources = new ArrayList<>();
+
+    public static void init() {
+        try {
+            AL.create();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static int loadSound(String fileName) {
+        int buffer = -1;
+        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream("res/" + fileName + ".wav"))) {
+            AudioInputStream ais = AudioSystem.getAudioInputStream(bis);
+            AudioFormat format = ais.getFormat();
+
+            int openALFormat = getOpenALFormat(format.getChannels(), format.getSampleSizeInBits());
+            byte[] audioBytes = ais.readAllBytes();
+            ByteBuffer data = BufferUtils.createByteBuffer(audioBytes.length);
+            data.put(audioBytes);
+            data.flip();
+
+            buffer = AL10.alGenBuffers();
+            AL10.alBufferData(buffer, openALFormat, data, (int) format.getSampleRate());
+
+            buffers.add(buffer);
+            ais.close();
+        } catch (UnsupportedAudioFileException | IOException e) {
+            e.printStackTrace();
+            System.err.println("Tried to load sound " + fileName + ".wav, didn't work");
+            System.exit(-1);
+        }
+        return buffer;
+    }
+
+    private static int getOpenALFormat(int channels, int bitsPerSample) {
+        if (channels == 1) {
+            return bitsPerSample == 8 ? AL10.AL_FORMAT_MONO8 : AL10.AL_FORMAT_MONO16;
+        } else if (channels == 2) {
+            return bitsPerSample == 8 ? AL10.AL_FORMAT_STEREO8 : AL10.AL_FORMAT_STEREO16;
+        } else {
+            throw new IllegalArgumentException("Unsupported number of channels: " + channels);
+        }
+    }
+
+    public static int createSource(int buffer) {
+        int source = AL10.alGenSources();
+        AL10.alSourcei(source, AL10.AL_BUFFER, buffer);
+        AL10.alSourcef(source, AL10.AL_GAIN, 1f);
+        AL10.alSourcef(source, AL10.AL_PITCH, 1f);
+        AL10.alSourcei(source, AL10.AL_LOOPING, AL10.AL_FALSE);
+        sources.add(source);
+        return source;
+    }
+
+    public static void playSource(int source) {
+        AL10.alSourcePlay(source);
+    }
+
+    public static void cleanUp() {
+        for (int source : sources) {
+            AL10.alDeleteSources(source);
+        }
+        for (int buffer : buffers) {
+            AL10.alDeleteBuffers(buffer);
+        }
+        AL.destroy();
+    }
+}
