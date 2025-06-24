@@ -1,0 +1,278 @@
+package engineTester;
+
+import models.RawModel;
+import models.TexturedModel;
+import org.lwjgl.opengl.Display;
+import org.lwjgl.util.vector.Vector3f;
+
+import audio.AudioMaster;
+import renderEngine.DisplayManager;
+import renderEngine.Loader;
+import renderEngine.MasterRenderer;
+import renderEngine.OBJLoader;
+import terrains.Terrain;
+import textures.ModelTexture;
+import entities.Entity;
+import entities.Camera;
+import entities.Light;
+
+import java.util.ArrayList;
+
+public class MainGameLoop {
+    public static RawModel generateRing(Loader loader, float innerRadius, float outerRadius, int segments) {
+        ArrayList<Float> vertices = new ArrayList<>();
+        ArrayList<Float> textureCoords = new ArrayList<>();
+        ArrayList<Float> normals = new ArrayList<>();
+        ArrayList<Integer> indices = new ArrayList<>();
+
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) (2 * Math.PI * i / segments);
+            float xInner = (float) Math.cos(angle) * innerRadius;
+            float zInner = (float) Math.sin(angle) * innerRadius;
+            float xOuter = (float) Math.cos(angle) * outerRadius;
+            float zOuter = (float) Math.sin(angle) * outerRadius;
+
+            vertices.add(xOuter);
+            vertices.add(0f);
+            vertices.add(zOuter);
+
+            normals.add(0f);
+            normals.add(1f); 
+            normals.add(0f);
+
+            textureCoords.add(1f);
+            textureCoords.add(0f);
+
+            vertices.add(xInner);
+            vertices.add(0f);
+            vertices.add(zInner);
+
+            normals.add(0f);
+            normals.add(1f);
+            normals.add(0f);
+
+            textureCoords.add(0f);
+            textureCoords.add(1f);
+        }
+
+        for (int i = 0; i < segments * 2; i += 2) {
+        	indices.add(i);
+        	indices.add(i + 2);
+        	indices.add(i + 1);
+        	indices.add(i + 1);
+        	indices.add(i + 2);
+        	indices.add(i + 3);
+        }
+
+        float[] verticesArray = new float[vertices.size()];
+        for (int i = 0; i < vertices.size(); i++) verticesArray[i] = vertices.get(i);
+
+        float[] textureArray = new float[textureCoords.size()];
+        for (int i = 0; i < textureCoords.size(); i++) textureArray[i] = textureCoords.get(i);
+
+        float[] normalsArray = new float[normals.size()];
+        for (int i = 0; i < normals.size(); i++) normalsArray[i] = normals.get(i);
+        
+        int[] indicesArray = new int[indices.size()];
+        for (int i = 0; i < indices.size(); i++) indicesArray[i] = indices.get(i);
+        return loader.loadToVAO(verticesArray, textureArray, normalsArray, indicesArray);
+    }
+
+    public static void main(String[] args) {
+        DisplayManager.createDisplay();
+        Loader loader = new Loader();
+        MasterRenderer renderer = new MasterRenderer();
+        Light light = new Light(new Vector3f(0, 0, 0), new Vector3f(1, 1, 1));
+        AudioMaster.init();
+
+
+        int longitudeDivisions = 50;
+        int latitudeDivisions = 50;
+        float radius = 0.1f;
+
+        ArrayList<Float> vertices = new ArrayList<>();
+        ArrayList<Float> textureCoords = new ArrayList<>();
+        ArrayList<Float> normals = new ArrayList<>();
+        ArrayList<Integer> indices = new ArrayList<>();
+
+        for (int lat = 0; lat <= latitudeDivisions; lat++) {
+            float theta = (float) (lat * Math.PI / latitudeDivisions);
+            for (int lon = 0; lon <= longitudeDivisions; lon++) {
+                float phi = (float) (lon * 2 * Math.PI / longitudeDivisions);
+
+                float x = (float) (radius * Math.sin(theta) * Math.cos(phi));
+                float y = (float) (radius * Math.sin(theta) * Math.sin(phi));
+                float z = (float) (radius * Math.cos(theta));
+
+                vertices.add(x);
+                vertices.add(y);
+                vertices.add(z);
+
+                textureCoords.add((float) lon / longitudeDivisions); 
+                textureCoords.add(1 - (float) lat / latitudeDivisions);
+
+                normals.add(x / radius);
+                normals.add(y / radius);
+                normals.add(z / radius);
+            }
+        }
+
+        for (int lat = 0; lat < latitudeDivisions; lat++) {
+            for (int lon = 0; lon < longitudeDivisions; lon++) {
+                int first = (lat * (longitudeDivisions + 1)) + lon;
+                int second = first + longitudeDivisions + 1;
+
+                indices.add(first);
+                indices.add(second);
+                indices.add(first + 1);
+                indices.add(second);
+                indices.add(second + 1);
+                indices.add(first + 1);
+            }
+        }
+
+        float[] verticesArray = new float[vertices.size()];
+        for (int i = 0; i < vertices.size(); i++) {
+            verticesArray[i] = vertices.get(i);
+        }
+
+        float[] textureCoordsArray = new float[textureCoords.size()];
+        for (int i = 0; i < textureCoords.size(); i++) {
+            textureCoordsArray[i] = textureCoords.get(i);
+        }
+
+        float[] normalsArray = new float[normals.size()];
+        for (int i = 0; i < normals.size(); i++) {
+            normalsArray[i] = normals.get(i);
+        }
+
+        int[] indicesArray = new int[indices.size()];
+        for (int i = 0; i < indices.size(); i++) {
+            indicesArray[i] = indices.get(i);
+        }
+        
+        float[] invertedNormalsArray = new float[normals.size()];
+        for (int i = 0; i < normals.size(); i++) {
+            invertedNormalsArray[i] = -normals.get(i); // multiplicar por -1
+        }
+
+        RawModel model = loader.loadToVAO(verticesArray, textureCoordsArray, normalsArray, indicesArray);
+        RawModel sunModelRaw = loader.loadToVAO(verticesArray, textureCoordsArray, invertedNormalsArray, indicesArray);
+        
+        ModelTexture sunTexture = new ModelTexture(loader.loadTexture("sun"));
+        ModelTexture mercurioTexture = new ModelTexture(loader.loadTexture("mercurio"));
+        ModelTexture venusTexture = new ModelTexture(loader.loadTexture("venus"));
+        ModelTexture tierraTexture = new ModelTexture(loader.loadTexture("earth"));
+        ModelTexture marteTexture = new ModelTexture(loader.loadTexture("marte"));
+        ModelTexture jupiterTexture = new ModelTexture(loader.loadTexture("jupiter"));
+        ModelTexture saturnoTexture = new ModelTexture(loader.loadTexture("saturno"));
+        ModelTexture uranoTexture = new ModelTexture(loader.loadTexture("urano"));
+        ModelTexture neptunoTexture = new ModelTexture(loader.loadTexture("neptuno"));
+        ModelTexture lunaTexture = new ModelTexture(loader.loadTexture("moon"));
+        ModelTexture ringTexture = new ModelTexture(loader.loadTexture("saturn_ring"));
+
+        TexturedModel sunModel = new TexturedModel(sunModelRaw, sunTexture);
+        ModelTexture texture = sunModel.getTexture();
+        texture.setShineDamper(1000);
+        texture.setReflectivity(100);
+        Entity sun = new Entity(sunModel, new Vector3f(0, 0, 0), 0, 0, 0, 0.5f);
+        
+        Entity planet1 = new Entity(new TexturedModel(model, mercurioTexture), new Vector3f(0.3f, 0, 0), 0, 0, 0, 0.1f);
+        Entity planet2 = new Entity(new TexturedModel(model, venusTexture), new Vector3f(0.4f, 0, 0), 0, 0, 0, 0.2f);
+        Entity planet3 = new Entity(new TexturedModel(model, tierraTexture), new Vector3f(0.5f, 0, 0), 0, 0, 0, 0.25f);
+        Entity planet4 = new Entity(new TexturedModel(model, marteTexture), new Vector3f(0.6f, 0, 0), 0, 0, 0, 0.15f);
+        Entity planet5 = new Entity(new TexturedModel(model, jupiterTexture), new Vector3f(0.7f, 0, 0), 0, 0, 0, 0.35f);
+        Entity planet6 = new Entity(new TexturedModel(model, saturnoTexture), new Vector3f(0.8f, 0, 0), 0, 0, 0, 0.3f);
+        Entity planet7 = new Entity(new TexturedModel(model, uranoTexture), new Vector3f(0.9f, 0, 0), 0, 0, 0, 0.25f);
+        Entity planet8 = new Entity(new TexturedModel(model, neptunoTexture), new Vector3f(1.0f, 0, 0), 0, 0, 0, 0.22f);
+        Entity luna = new Entity(new TexturedModel(model, lunaTexture), new Vector3f(0.55f, 0, 0), 0, 0, 0, 0.05f);
+        
+        RawModel ringRaw = generateRing(loader, 0.07f, 0.045f, 64);
+        TexturedModel saturnRingModel = new TexturedModel(ringRaw, ringTexture);
+        Entity saturnRing = new Entity(saturnRingModel, planet6.getPosition(), 20, 0, 0, 1);
+
+        Entity[] planets = {planet1, planet2, planet3, planet4, planet5, planet6, planet7, planet8};
+        float[] orbitalSpeeds = {0.05f, 0.03f, 0.02f, 0.015f, 0.01f, 0.008f, 0.005f, 0.004f};
+        float[] distancesFromSun = {
+            0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f
+        };
+        
+        Terrain terrain = new Terrain(0,0,loader,new ModelTexture(loader.loadTexture("galaxy")));
+        Terrain terrain2 = new Terrain(-1,0,loader,new ModelTexture(loader.loadTexture("galaxy")));
+        Terrain terrain3 = new Terrain(0,-1,loader,new ModelTexture(loader.loadTexture("galaxy")));
+        Terrain terrain4 = new Terrain(-1,-1,loader,new ModelTexture(loader.loadTexture("galaxy")));
+
+        Camera camera = new Camera(light);
+        
+        ArrayList<Entity> estrellas = new ArrayList<>();
+        ModelTexture starTexture = new ModelTexture(loader.loadTexture("star"));
+        TexturedModel starModel = new TexturedModel(model, starTexture);
+        int buffer = AudioMaster.loadSound("sound");
+        int source = AudioMaster.createSource(buffer);
+        AudioMaster.playSource(source);
+
+        int cantidadEstrellas = 1000;
+        float radioMax = 10.0f;
+        for (int i = 0; i < cantidadEstrellas; i++) {
+            float angle = (float) (Math.random() * 2 * Math.PI);
+            float distance = (float) (Math.random() * radioMax);
+            float height = (float) (Math.random() * 4 - 2);
+            float x = (float) Math.cos(angle) * distance;
+            float z = (float) Math.sin(angle) * distance;
+            
+            float escala = 0.01f + (float)Math.random() * 0.03f;
+            Entity estrella = new Entity(starModel, new Vector3f(x, height, z), 0, 0, 0, escala);
+            estrellas.add(estrella);
+        }
+
+        while (!Display.isCloseRequested()) {
+            sun.increaseRotation(0, 0.5f, 0);
+            for (int i = 0; i < planets.length; i++) {
+                Entity planet = planets[i];
+                float angle = (System.nanoTime() / 100000000.0f) * orbitalSpeeds[i];
+                float x = (float) Math.cos(angle) * distancesFromSun[i];
+                float z = (float) Math.sin(angle) * distancesFromSun[i];
+                planet.setPosition(new Vector3f(x, 0, z));
+                planet.increaseRotation(0, 1f, 0);
+            }
+
+            Vector3f tierraPos = planet3.getPosition();
+            float lunaOrbitalSpeed = 0.1f;
+            float lunaDistance = 0.05f;
+            float lunaAngle = (System.nanoTime() / 100000000.0f) * lunaOrbitalSpeed;
+            float lunaInclination = (float) Math.toRadians(15);
+            float lunaX = (float) Math.cos(lunaAngle) * lunaDistance + tierraPos.x;
+            float lunaZ = (float) Math.sin(lunaAngle) * lunaDistance + tierraPos.z;
+            float lunaY = (float) ((float) Math.sin(lunaAngle) * lunaDistance * Math.sin(lunaInclination));
+
+            luna.setPosition(new Vector3f(lunaX, lunaY, lunaZ));
+            luna.increaseRotation(0, 1f, 0);
+            saturnRing.setPosition(planet6.getPosition());
+            saturnRing.increaseRotation(0, 1f, 0);
+
+            camera.move();
+
+            renderer.processTerrain(terrain);
+            renderer.processTerrain(terrain2);
+            renderer.processTerrain(terrain3);
+            renderer.processTerrain(terrain4);
+            renderer.processEntity(sun);
+            for (Entity planet : planets) {
+                renderer.processEntity(planet);
+            }
+            renderer.processEntity(luna);
+            renderer.processEntity(saturnRing);
+            for (Entity estrella : estrellas) {
+                renderer.processEntity(estrella);
+            }
+            renderer.render(light, camera);
+
+            DisplayManager.updateDisplay();
+        }
+        
+        AudioMaster.cleanUp();
+        renderer.cleanUp();
+        loader.cleanUp();
+        DisplayManager.closeDisplay();
+    }
+}
